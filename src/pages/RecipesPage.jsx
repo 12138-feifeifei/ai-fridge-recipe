@@ -44,8 +44,14 @@ export default function RecipesPage() {
   }, [recipes])
 
   const handleRegenerate = async () => {
-    const ok = await regenerateRecipes()
-    showToast(ok ? '已换一批食谱' : '生成失败，请重试')
+    const result = await regenerateRecipes()
+    if (result.ok) {
+      showToast('已换一批食谱')
+      return
+    }
+    if (result.reason === 'STALE') return
+    // error.message 已经由请求层归一化成友好文案（401 / 500 / 超时 / 断网…）
+    showToast(result.error?.message || '生成失败，请重试', { duration: 3600 })
   }
 
   const handleRestart = () => {

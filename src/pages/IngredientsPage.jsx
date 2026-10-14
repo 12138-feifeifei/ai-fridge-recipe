@@ -28,6 +28,7 @@ export default function IngredientsPage() {
     restoreIngredient,
     generateRecipes,
     resetAll,
+    dataSource,
   } = useApp()
   const navigate = useNavigate()
   const showToast = useToast()
@@ -68,9 +69,14 @@ export default function IngredientsPage() {
       showToast('至少勾选一种食材才能生成食谱')
       return
     }
-    const ok = await generateRecipes()
-    if (ok) navigate('/recipes')
-    else showToast('生成失败，请重试')
+    const result = await generateRecipes()
+    if (result.ok) {
+      navigate('/recipes')
+      return
+    }
+    if (result.reason === 'STALE') return
+    // error.message 已经由请求层归一化成友好文案（401 / 500 / 超时 / 断网…）
+    showToast(result.error?.message || '生成失败，请重试', { duration: 3600 })
   }
 
   const handleRestart = () => {
@@ -221,7 +227,8 @@ export default function IngredientsPage() {
                 下一步会用这些食材做什么？
               </p>
               <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
-                点击底部「生成食谱」，会把已勾选的 {selectedCount} 种食材发送给认谱服务（当前为 Mock），
+                点击底部「生成食谱」，会把已勾选的 {selectedCount} 种食材发送给
+                {dataSource === 'mock' ? '本地 Mock' : '后端推荐'}服务，
                 返回带热量、时长和分步骤做法的推荐菜谱。
               </p>
             </Card>

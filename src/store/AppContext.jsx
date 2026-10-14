@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  DATA_SOURCE,
   generateRecipes as requestRecipes,
   recognizeIngredients as requestRecognizeIngredients,
 } from '../services/api.js'
@@ -161,7 +162,7 @@ export function AppProvider({ children }) {
 
   const startRecognition = useCallback(async () => {
     const current = stateRef.current
-    if (!current.previewUrl) return false
+    if (!current.previewUrl) return { ok: false, error: null, reason: 'NO_IMAGE' }
 
     const taskId = ++taskRef.current
     setState((prev) => ({ ...prev, status: 'recognizing', progress: 0, progressText: '准备中…', error: null }))
@@ -177,7 +178,7 @@ export function AppProvider({ children }) {
           setState((prev) => ({ ...prev, progress, progressText: text }))
         },
       })
-      if (taskRef.current !== taskId) return false
+      if (taskRef.current !== taskId) return { ok: false, error: null, reason: 'STALE' }
 
       setState((prev) => ({
         ...prev,
@@ -191,12 +192,12 @@ export function AppProvider({ children }) {
         recognizedAt: payload.meta?.recognizedAt ?? new Date().toISOString(),
         generatedAt: null,
       }))
-      return true
+      return { ok: true, error: null }
     } catch (error) {
       if (taskRef.current === taskId) {
         setState((prev) => ({ ...prev, status: 'idle', progress: 0, progressText: '', error: error.message }))
       }
-      return false
+      return { ok: false, error }
     }
   }, [])
 
@@ -262,7 +263,7 @@ export function AppProvider({ children }) {
   const runGeneration = useCallback(async ({ refresh = false } = {}) => {
     const current = stateRef.current
     const selected = current.ingredients.filter((item) => item.selected !== false)
-    if (!selected.length) return false
+    if (!selected.length) return { ok: false, error: null, reason: 'NO_INGREDIENTS' }
 
     const taskId = ++taskRef.current
     setState((prev) => ({ ...prev, status: 'generating', progress: 0, progressText: '准备中…', error: null }))
@@ -275,7 +276,7 @@ export function AppProvider({ children }) {
           setState((prev) => ({ ...prev, progress, progressText: text }))
         },
       })
-      if (taskRef.current !== taskId) return false
+      if (taskRef.current !== taskId) return { ok: false, error: null, reason: 'STALE' }
 
       const recipes = toRecipeModelList(payload.data)
       setState((prev) => ({
@@ -288,7 +289,7 @@ export function AppProvider({ children }) {
         refreshKey: refresh ? prev.refreshKey + 1 : 0,
         generatedAt: payload.meta?.generatedAt ?? new Date().toISOString(),
       }))
-      return true
+      return { ok: true, error: null }
     } catch (error) {
       if (taskRef.current === taskId) {
         setState((prev) => ({
@@ -299,7 +300,7 @@ export function AppProvider({ children }) {
           error: error.message,
         }))
       }
-      return false
+      return { ok: false, error }
     }
   }, [])
 
@@ -316,6 +317,7 @@ export function AppProvider({ children }) {
   const value = useMemo(
     () => ({
       ...state,
+      dataSource: DATA_SOURCE,
       selectedIngredients,
       selectedCount: selectedIngredients.length,
       hasSelection: selectedIngredients.length > 0,
