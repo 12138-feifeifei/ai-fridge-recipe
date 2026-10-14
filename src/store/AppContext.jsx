@@ -17,9 +17,11 @@ const INITIAL_STATE = {
   progressText: '',
   previewUrl: null,
   imageName: '',
+  imageBytes: 0,
   isSampleImage: false,
   ingredients: [],
   recipes: [],
+  matchedTotal: 0,
   refreshKey: 0,
   recognizedAt: null,
   generatedAt: null,
@@ -37,6 +39,7 @@ function loadPersistedState() {
     return {
       ingredients: Array.isArray(parsed.ingredients) ? parsed.ingredients : [],
       recipes: Array.isArray(parsed.recipes) ? parsed.recipes : [],
+      matchedTotal: Number.isInteger(parsed.matchedTotal) ? parsed.matchedTotal : 0,
       refreshKey: Number.isInteger(parsed.refreshKey) ? parsed.refreshKey : 0,
       recognizedAt: parsed.recognizedAt ?? null,
       generatedAt: parsed.generatedAt ?? null,
@@ -69,6 +72,7 @@ export function AppProvider({ children }) {
         JSON.stringify({
           ingredients: state.ingredients,
           recipes: state.recipes,
+          matchedTotal: state.matchedTotal,
           refreshKey: state.refreshKey,
           recognizedAt: state.recognizedAt,
           generatedAt: state.generatedAt,
@@ -77,12 +81,12 @@ export function AppProvider({ children }) {
     } catch {
       // 隐私模式下 sessionStorage 可能不可用，忽略即可
     }
-  }, [state.ingredients, state.recipes, state.refreshKey, state.recognizedAt, state.generatedAt])
+  }, [state.ingredients, state.recipes, state.matchedTotal, state.refreshKey, state.recognizedAt, state.generatedAt])
 
   /* ----------------------------- 图片 ----------------------------- */
 
   const selectImage = useCallback(async (file) => {
-    const { previewUrl } = await prepareImage(file)
+    const { previewUrl, bytes } = await prepareImage(file)
     setState((prev) => ({
       ...prev,
       status: 'idle',
@@ -90,9 +94,11 @@ export function AppProvider({ children }) {
       progressText: '',
       previewUrl,
       imageName: file.name || '冰箱照片',
+      imageBytes: bytes ?? 0,
       isSampleImage: false,
       ingredients: [],
       recipes: [],
+      matchedTotal: 0,
       recognizedAt: null,
       generatedAt: null,
       error: null,
@@ -108,9 +114,11 @@ export function AppProvider({ children }) {
       progressText: '',
       previewUrl: SAMPLE_PHOTO_DATA_URL,
       imageName: '示例冰箱照片',
+      imageBytes: 0,
       isSampleImage: true,
       ingredients: [],
       recipes: [],
+      matchedTotal: 0,
       recognizedAt: null,
       generatedAt: null,
       error: null,
@@ -125,6 +133,7 @@ export function AppProvider({ children }) {
       progressText: '',
       previewUrl: null,
       imageName: '',
+      imageBytes: 0,
       isSampleImage: false,
     }))
   }, [])
@@ -167,6 +176,7 @@ export function AppProvider({ children }) {
         progressText: '',
         ingredients: result.ingredients,
         recipes: [],
+        matchedTotal: 0,
         refreshKey: 0,
         recognizedAt: result.recognizedAt,
         generatedAt: null,
@@ -265,6 +275,7 @@ export function AppProvider({ children }) {
         progress: 100,
         progressText: '',
         recipes: result.recipes,
+        matchedTotal: result.matchedTotal ?? result.recipes.length,
         refreshKey: refresh ? prev.refreshKey + 1 : 0,
         generatedAt: result.generatedAt,
       }))

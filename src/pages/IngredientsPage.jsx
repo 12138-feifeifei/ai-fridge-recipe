@@ -153,6 +153,12 @@ export default function IngredientsPage() {
                   已选 {selectedCount} 种
                 </span>
               </div>
+              <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/25">
+                <div
+                  className="h-full rounded-full bg-white transition-[width] duration-300 ease-out"
+                  style={{ width: `${ingredients.length ? (selectedCount / ingredients.length) * 100 : 0}%` }}
+                />
+              </div>
               <div className="mt-3 flex items-center justify-between gap-3">
                 <p className="text-[11px] leading-relaxed text-white/75">
                   点击行即可勾选 / 取消，右侧按钮可编辑或删除
@@ -166,6 +172,12 @@ export default function IngredientsPage() {
                 </button>
               </div>
             </Card>
+
+            {selectedCount === 0 ? (
+              <p className="animate-rise rounded-2xl bg-amber-50 px-4 py-3 text-xs font-medium text-amber-700">
+                还没有勾选任何食材，至少勾选一样才能生成食谱。
+              </p>
+            ) : null}
 
             <div className="space-y-4">
               {grouped.map((group, groupIndex) => (

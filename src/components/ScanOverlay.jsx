@@ -1,5 +1,3 @@
-import { SparkleIcon } from './icons.jsx'
-
 /**
  * 全屏加载层：识别 / 生成食谱共用。
  * 图片上叠加雷达扫描线 + 进度条 + 动态状态文案。
@@ -12,6 +10,7 @@ export function ScanOverlay({
   title = '正在识别食材',
   caption = 'AI 正在分析这张照片',
   tips = [],
+  funEmojis = ['🧊', '🥬', '🍅', '🥚', '🍗'],
 }) {
   if (!open) return null
 
@@ -49,12 +48,40 @@ export function ScanOverlay({
 
         <div className="mt-4 px-1">
           <div className="flex items-center gap-2">
-            <SparkleIcon className="h-4 w-4 text-brand-500" />
+            <span
+              className="animate-breathe grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand-50 text-sm"
+              aria-hidden="true"
+            >
+              👨‍🍳
+            </span>
             <p className="text-base font-bold text-slate-800">{title}</p>
             <span className="ml-auto text-sm font-semibold text-brand-600">{safeProgress}%</span>
           </div>
 
-          <p className="mt-1.5 h-5 text-sm text-slate-500">{text || '处理中…'}</p>
+          <p className="mt-2 flex h-5 items-center text-sm font-medium text-slate-500">
+            {text || '处理中…'}
+            <span className="ml-0.5 inline-flex" aria-hidden="true">
+              {[0, 1, 2].map((index) => (
+                <span key={index} className="animate-hop" style={{ animationDelay: `${index * 160}ms` }}>
+                  .
+                </span>
+              ))}
+            </span>
+          </p>
+
+          {/* 一排「排队进锅」的小食材，等待时看起来更有趣 */}
+          <div className="mt-3 flex items-center justify-center gap-2">
+            {funEmojis.map((emoji, index) => (
+              <span
+                key={`${emoji}-${index}`}
+                className="animate-hop text-lg"
+                style={{ animationDelay: `${index * 150}ms` }}
+                aria-hidden="true"
+              >
+                {emoji}
+              </span>
+            ))}
+          </div>
 
           <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
             <div

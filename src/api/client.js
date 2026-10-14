@@ -14,8 +14,17 @@ import { rankRecipes } from '../data/recipes.js'
 export const DATA_SOURCE = 'mock' // 'mock' | 'http'
 export const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
-const RECOGNIZE_TEXTS = ['正在读取照片…', '识别食材中…', '匹配常见食材库…', '整理识别结果…']
+// 识别时的趣味文案，2 秒内依次切换（Mock），让等待过程不那么干巴
+const RECOGNIZE_TEXTS = [
+  'AI 正在努力识别你的冰箱…',
+  '先看看蔬菜抽屉里藏了什么…',
+  '再翻翻冷冻层和门上格…',
+  '马上就好，正在整理食材清单…',
+]
 const GENERATE_TEXTS = ['分析食材搭配…', '计算营养与热量…', '搭配合适的菜式…', '生成烹饪步骤…']
+
+// 识别动画总时长（毫秒）：2 秒后自动跳转到食材清单页
+export const RECOGNIZE_DURATION = 2000
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -46,7 +55,7 @@ async function animateProgress({ duration, texts, onProgress }) {
  */
 export async function recognizeIngredients(payload = {}, { onProgress } = {}) {
   if (DATA_SOURCE === 'mock') {
-    await animateProgress({ duration: 2200, texts: RECOGNIZE_TEXTS, onProgress })
+    await animateProgress({ duration: RECOGNIZE_DURATION, texts: RECOGNIZE_TEXTS, onProgress })
     return {
       imageUrl: payload.previewUrl ?? null,
       ingredients: MOCK_INGREDIENTS.map((item) => ({ ...item })),
@@ -89,8 +98,10 @@ export async function generateRecipes(payload = {}, { onProgress } = {}) {
 
   if (DATA_SOURCE === 'mock') {
     await animateProgress({ duration: 1800, texts: GENERATE_TEXTS, onProgress })
+    const ranked = rankRecipes(ingredients, { refreshKey: payload.refreshKey ?? 0 })
     return {
-      recipes: rankRecipes(ingredients, { refreshKey: payload.refreshKey ?? 0 }),
+      recipes: ranked.recipes,
+      matchedTotal: ranked.total,
       generatedAt: new Date().toISOString(),
     }
   }
@@ -104,5 +115,6 @@ export async function generateRecipes(payload = {}, { onProgress } = {}) {
   if (!response.ok) throw new Error(`生成食谱失败（${response.status}）`)
 
   const data = await response.json()
-  return { recipes: data.recipes ?? [], generatedAt: new Date().toISOString() }
+  const recipes = data.recipes ?? []
+  return { recipes, matchedTotal: data.matchedTotal ?? recipes.length, generatedAt: new Date().toISOString() }
 }

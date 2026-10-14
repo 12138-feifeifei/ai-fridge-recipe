@@ -167,6 +167,11 @@
     background-size: 200% 100%;
     animation: shimmer 1.6s linear infinite;
   }
+
+  /* 等待动画里的小食材上下「跳一跳」 */
+  .animate-hop {
+    animation: hop 1.4s ease-in-out infinite;
+  }
 }
 
 @keyframes rise {
@@ -233,5 +238,21 @@
   }
   to {
     background-position: -200% 0;
+  }
+}
+
+@keyframes hop {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.75;
+  }
+  35% {
+    transform: translateY(-6px) scale(1.12);
+    opacity: 1;
+  }
+  70% {
+    transform: translateY(0) scale(1);
+    opacity: 0.9;
   }
 }

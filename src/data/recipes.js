@@ -192,34 +192,46 @@ export const MOCK_RECIPES = [
 const BATCH_SIZE = 3
 
 /**
- * 按「命中食材比例」给食谱打分排序，并用 refreshKey 支持「换一批」。
+ * 只保留「用到了当前勾选食材」的食谱，再按命中比例排序。
+ *
+ * - 一条都没命中 → 返回空列表，由页面展示友好的空状态（不再回退成全部食谱）。
+ * - refreshKey 用于「换一批」：在命中的食谱池里按批轮换，保证每次出现的仍是匹配食谱。
+ *
+ * 返回 { recipes, total }，total 是命中的食谱总数，方便页面提示「共匹配 N 道」。
  * 接入真实后端后，这里可以整体替换为接口返回结果。
  */
-export function rankRecipes(ingredients = [], { limit = BATCH_SIZE, refreshKey = 0 } = {}) {
+export function rankRecipes(ingredients = [], { limit = BATCH_SIZE, refreshKey = 0, minMatch = 1 } = {}) {
   const names = new Set(
     ingredients.map((item) => (typeof item === 'string' ? item : item?.name)).filter(Boolean),
   )
 
-  const scored = MOCK_RECIPES.map((recipe) => {
+  if (!names.size) return { recipes: [], total: 0 }
+
+  const pool = MOCK_RECIPES.map((recipe) => {
     const matched = recipe.uses.filter((name) => names.has(name))
-    const pantry = recipe.seasonings.filter((name) => names.has(name))
-    const seasoningsHit = recipe.seasonings.filter((name) => !names.has(name))
+    const seasoningsHit = recipe.seasonings.filter((name) => names.has(name))
+    const pantry = recipe.seasonings.filter((name) => !names.has(name))
     const score =
       (matched.length / recipe.uses.length) * 0.8 +
-      (pantry.length / Math.max(1, recipe.seasonings.length)) * 0.2
-    return { recipe, matched, pantry: seasoningsHit, score }
+      (seasoningsHit.length / Math.max(1, recipe.seasonings.length)) * 0.2
+    return { recipe, matched, pantry, score }
   })
+    // 只保留真正用到了勾选食材的食谱
+    .filter((item) => item.matched.length >= Math.min(minMatch, item.recipe.uses.length))
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        b.matched.length - a.matched.length ||
+        (a.recipe.minutes ?? 0) - (b.recipe.minutes ?? 0),
+    )
 
-  const minMatch = 2
-  const qualified = scored.filter((item) => item.matched.length >= Math.min(minMatch, item.recipe.uses.length))
-  const pool = (qualified.length ? qualified : scored)
-    .slice()
-    .sort((a, b) => b.score - a.score || b.matched.length - a.matched.length)
+  if (!pool.length) return { recipes: [], total: 0 }
 
-  const offset = pool.length ? (((refreshKey % pool.length) + pool.length) % pool.length) : 0
+  // 按 limit 分批轮换：换一批时看到的是另一组匹配食谱，而不是把最佳匹配挤掉
+  const offset = (((refreshKey * limit) % pool.length) + pool.length) % pool.length
   const rotated = [...pool.slice(offset), ...pool.slice(0, offset)]
 
-  return rotated.slice(0, limit).map((item, index) => {
+  const recipes = rotated.slice(0, limit).map((item, index) => {
     const uses = item.recipe.uses
     const matchRate = Math.round((item.matched.length / uses.length) * 100)
     return {
@@ -232,4 +244,6 @@ export function rankRecipes(ingredients = [], { limit = BATCH_SIZE, refreshKey =
       batchIndex: index,
     }
   })
+
+  return { recipes, total: pool.length }
 }

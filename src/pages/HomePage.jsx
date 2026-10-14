@@ -4,7 +4,7 @@ import { useApp } from '../store/AppContext.jsx'
 import { AppShell, PageHeader, StickyFooter } from '../components/AppShell.jsx'
 import { ScanOverlay } from '../components/ScanOverlay.jsx'
 import { useToast } from '../components/Toast.jsx'
-import { AlbumIcon, ArrowRightIcon, CameraIcon, SparkleIcon, UploadIcon } from '../components/icons.jsx'
+import { AlbumIcon, ArrowRightIcon, CameraIcon, CheckIcon, SparkleIcon, UploadIcon } from '../components/icons.jsx'
 import { Button, Card, cx } from '../components/ui.jsx'
 
 const RECOGNIZE_TIPS = ['光线充足、没有反光时识别更准', '食材平铺摆放，尽量不要互相遮挡', '识别结果可以手动增删改']
@@ -15,10 +15,18 @@ const FLOW_STEPS = [
   { emoji: '🍳', title: '生成食谱', desc: '含步骤与热量' },
 ]
 
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return ''
+  if (bytes < 1024) return '不到 1 KB'
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
 export default function HomePage() {
   const {
     previewUrl,
     imageName,
+    imageBytes,
     isSampleImage,
     status,
     progress,
@@ -64,6 +72,8 @@ export default function HomePage() {
   let dropzoneStateClass = 'border-slate-300/90 bg-white/60 hover:border-brand-400 hover:bg-brand-50/40'
   if (dragging) dropzoneStateClass = 'border-brand-400 bg-brand-50/70'
 
+  const sizeLabel = isSampleImage ? '' : formatBytes(imageBytes)
+
   return (
     <AppShell
       footer={
@@ -97,6 +107,37 @@ export default function HomePage() {
         </section>
 
         <Card className="p-4">
+          {/* 本地缩略图预览：选完照片立刻能看到，还能看到文件名和体积 */}
+          {previewUrl ? (
+            <div className="mb-3 flex items-center gap-3 rounded-2xl border border-brand-100 bg-brand-50/60 p-2.5">
+              <img
+                src={previewUrl}
+                alt="已选照片的本地缩略图"
+                className="h-14 w-14 shrink-0 rounded-xl object-cover shadow-card"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-semibold text-slate-700">
+                  {isSampleImage ? '示例冰箱照片' : imageName || '冰箱照片'}
+                </p>
+                <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">
+                  <span className="inline-flex items-center gap-0.5 font-medium text-brand-600">
+                    <CheckIcon className="h-3.5 w-3.5" />
+                    本地预览已就绪
+                  </span>
+                  {sizeLabel ? <span>· {sizeLabel}</span> : null}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => albumInputRef.current?.click()}
+                disabled={reading}
+                className="shrink-0 rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 shadow-card transition hover:text-brand-600 active:scale-95 disabled:opacity-50"
+              >
+                更换
+              </button>
+            </div>
+          ) : null}
+
           <div
             onDragOver={(event) => {
               event.preventDefault()
@@ -226,9 +267,10 @@ export default function HomePage() {
         imageUrl={previewUrl}
         progress={progress}
         text={progressText}
-        title="正在识别食材"
-        caption="AI 正在分析这张照片"
+        title="AI 正在努力识别你的冰箱"
+        caption="一边扫描照片，一边清点食材"
         tips={RECOGNIZE_TIPS}
+        funEmojis={['🧊', '🥬', '🍅', '🥚', '🥕']}
       />
     </AppShell>
   )
