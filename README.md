@@ -39,7 +39,9 @@ npm run dev:host # 局域网访问（手机真机调试）
     ├── main.jsx               # 应用入口：Router / Toast / 全局状态 Provider
     ├── App.jsx                # 路由表
     ├── index.css              # Tailwind 引入 + @theme 设计变量 + 动画
-    ├── api/client.js          # ⭐ 数据访问层（Mock / 真实后端切换点）
+    ├── services
+    │   ├── api.js             # ⭐ API 请求层 + 前后端数据契约（Mock / 真实后端切换点）
+    │   └── adapters.js        # 接口字段 → 页面视图模型的适配
     ├── data
     │   ├── ingredients.js     # 假数据：识别出的食材 + 常见食材字典
     │   ├── recipes.js         # 假数据：食谱库 + 匹配排序算法
@@ -64,26 +66,46 @@ npm run dev:host # 局域网访问（手机真机调试）
    卡片包含菜名、卡路里、预计时长、难度、食材匹配度、分步骤做法，支持展开全部步骤。
    如果一个都没匹配上，会给出「没找到匹配食谱」的友好空状态，并引导回食材清单调整。
 
-## Mock 数据与后端对接
+## API 请求层与数据契约
 
-数据访问统一收口在 [src/api/client.js](src/api/client.js)，页面组件不直接接触假数据：
+所有网络请求统一收口在 [src/services/api.js](src/services/api.js)，页面与 store 只调用两个业务函数，
+不直接接触 `fetch` 或假数据：
 
 ```js
-export const DATA_SOURCE = 'mock' // 改成 'http' 即可切到真实后端
+import { recognizeIngredients, generateRecipes } from './services/api.js'
+
+const res = await recognizeIngredients(imageFile)
+// res.data → [{ id: '1', name: '番茄', confidence: 0.98 }]
+
+const res2 = await generateRecipes([{ id: '1', name: '番茄' }], { refreshKey: 0 })
+// res2.data → [{ id: 'r1', title: '番茄炒蛋', calories: 300, time: '15分钟', steps: ['步骤1', ...] }]
 ```
 
-期望的接口契约（已在文件中写好调用代码，只需替换 `DATA_SOURCE`）：
+响应统一使用 `{ success, data, meta?, message? }` 信封；失败时抛出 `ApiError`（含 `status` / `code`）。
+完整字段说明写在 `api.js` 顶部的 JSDoc 里，可以直接发给后端同学对照实现。
 
-| 接口 | 方法 | 入参 | 返回 |
+| 接口 | 方法 | 请求 | 成功响应 |
 | --- | --- | --- | --- |
-| `/api/ingredients/recognize` | POST | `FormData: image` | `{ ingredients: Ingredient[] }` |
-| `/api/recipes/generate` | POST | `{ ingredients: string[] }` | `{ recipes: Recipe[] }` |
+| `/api/ingredients/recognize` | POST | `FormData: image` | `{ success: true, data: Ingredient[], meta: { count } }` |
+| `/api/recipes/generate` | POST | `{ ingredients: string[], refreshKey: number }` | `{ success: true, data: Recipe[], meta: { total, refreshKey } }` |
 
-`Ingredient`：`{ id, name, emoji, quantity, category, confidence, selected }`
-`Recipe`：`{ id, name, emoji, calories, minutes, difficulty, servings, intro, tip, cover, uses, matched, pantry, steps: [{ text, minutes }] }`
+失败响应：`{ success: false, message: '识别失败，请重新上传', code: 'RECOGNIZE_FAILED' }`
 
-接口基址用环境变量覆盖：复制 `.env.example` 为 `.env.local`，按需改成
-`VITE_API_BASE_URL=http://localhost:8000/api`（同时可打开 `vite.config.js` 里的 `/api` 代理）。
+`Ingredient`（data 元素）：`{ id, name, confidence, emoji?, quantity?, category?, selected? }`
+
+`Recipe`（data 元素）：`{ id, title, calories, time, steps, emoji?, cover?, difficulty?, servings?, intro?, tip?, ingredients?, matched?, pantry?, matchRate?, minutes? }`
+——其中 `steps` 支持 `['步骤1', '步骤2']` 或 `[{ text, minutes }]` 两种写法。
+
+请求基址与 Mock 开关都用环境变量控制（复制 `.env.example` 为 `.env.local`）：
+
+```bash
+VITE_API_BASE_URL=https://fridge-chef.pages.dev   # 同源部署可留空或写 /api
+VITE_USE_MOCK_API=false                            # 关掉 Mock，改走真实接口
+```
+
+请求层已内置统一能力：超时中断（`AbortController`）、HTTP/业务错误归一化成 `ApiError`、
+全局加载状态（`beginLoading` / `subscribeApiLoading` / `useApiLoading`）。
+后端字段和页面字段不一致时，只改 [src/services/adapters.js](src/services/adapters.js) 即可。
 
 ## 设计说明
 

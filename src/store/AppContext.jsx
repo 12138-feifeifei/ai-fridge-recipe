@@ -1,8 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { generateRecipes as requestRecipes, recognizeIngredients } from '../api/client.js'
+import {
+  generateRecipes as requestRecipes,
+  recognizeIngredients as requestRecognizeIngredients,
+} from '../services/api.js'
+import { toIngredientModelList, toRecipeModelList } from '../services/adapters.js'
 import { guessCategory, guessEmoji } from '../data/ingredients.js'
 import { SAMPLE_PHOTO_DATA_URL } from '../data/samplePhoto.js'
-import { prepareImage } from '../utils/image.js'
+import { dataUrlToFile, prepareImage } from '../utils/image.js'
 
 /**
  * 全局状态：图片 → 识别 → 食材清单 → 生成食谱
@@ -18,6 +22,7 @@ const INITIAL_STATE = {
   previewUrl: null,
   imageName: '',
   imageBytes: 0,
+  imageFile: null,
   isSampleImage: false,
   ingredients: [],
   recipes: [],
@@ -86,7 +91,7 @@ export function AppProvider({ children }) {
   /* ----------------------------- 图片 ----------------------------- */
 
   const selectImage = useCallback(async (file) => {
-    const { previewUrl, bytes } = await prepareImage(file)
+    const { previewUrl, file: uploadFile, bytes } = await prepareImage(file)
     setState((prev) => ({
       ...prev,
       status: 'idle',
@@ -95,6 +100,7 @@ export function AppProvider({ children }) {
       previewUrl,
       imageName: file.name || '冰箱照片',
       imageBytes: bytes ?? 0,
+      imageFile: uploadFile ?? file,
       isSampleImage: false,
       ingredients: [],
       recipes: [],
@@ -115,6 +121,8 @@ export function AppProvider({ children }) {
       previewUrl: SAMPLE_PHOTO_DATA_URL,
       imageName: '示例冰箱照片',
       imageBytes: 0,
+      // 示例照片没有 File，识别时按需从 previewUrl 现场生成
+      imageFile: null,
       isSampleImage: true,
       ingredients: [],
       recipes: [],
@@ -134,6 +142,7 @@ export function AppProvider({ children }) {
       previewUrl: null,
       imageName: '',
       imageBytes: 0,
+      imageFile: null,
       isSampleImage: false,
     }))
   }, [])
@@ -158,15 +167,16 @@ export function AppProvider({ children }) {
     setState((prev) => ({ ...prev, status: 'recognizing', progress: 0, progressText: '准备中…', error: null }))
 
     try {
-      const result = await recognizeIngredients(
-        { previewUrl: current.previewUrl, imageName: current.imageName },
-        {
-          onProgress: ({ progress, text }) => {
-            if (taskRef.current !== taskId) return
-            setState((prev) => ({ ...prev, progress, progressText: text }))
-          },
+      // 正常上传时用压缩后的 File；示例照片等没有 File 的情况，按需从 previewUrl 现场生成
+      const imageFile =
+        current.imageFile ?? (await dataUrlToFile(current.previewUrl, current.imageName || 'fridge-photo'))
+
+      const payload = await requestRecognizeIngredients(imageFile, {
+        onProgress: ({ progress, text }) => {
+          if (taskRef.current !== taskId) return
+          setState((prev) => ({ ...prev, progress, progressText: text }))
         },
-      )
+      })
       if (taskRef.current !== taskId) return false
 
       setState((prev) => ({
@@ -174,11 +184,11 @@ export function AppProvider({ children }) {
         status: 'ready',
         progress: 100,
         progressText: '',
-        ingredients: result.ingredients,
+        ingredients: toIngredientModelList(payload.data),
         recipes: [],
         matchedTotal: 0,
         refreshKey: 0,
-        recognizedAt: result.recognizedAt,
+        recognizedAt: payload.meta?.recognizedAt ?? new Date().toISOString(),
         generatedAt: null,
       }))
       return true
@@ -196,7 +206,7 @@ export function AppProvider({ children }) {
     setState((prev) => ({
       ...prev,
       ingredients: prev.ingredients.map((item) =>
-        item.id === id ? { ...item, selected: item.selected === false } : item,
+        item.id === id ? { ...item, selected: !(item.selected !== false) } : item,
       ),
     }))
   }, [])
@@ -258,26 +268,25 @@ export function AppProvider({ children }) {
     setState((prev) => ({ ...prev, status: 'generating', progress: 0, progressText: '准备中…', error: null }))
 
     try {
-      const result = await requestRecipes(
-        { ingredients: selected, refreshKey: refresh ? current.refreshKey + 1 : 0 },
-        {
-          onProgress: ({ progress, text }) => {
-            if (taskRef.current !== taskId) return
-            setState((prev) => ({ ...prev, progress, progressText: text }))
-          },
+      const payload = await requestRecipes(selected, {
+        refreshKey: refresh ? current.refreshKey + 1 : 0,
+        onProgress: ({ progress, text }) => {
+          if (taskRef.current !== taskId) return
+          setState((prev) => ({ ...prev, progress, progressText: text }))
         },
-      )
+      })
       if (taskRef.current !== taskId) return false
 
+      const recipes = toRecipeModelList(payload.data)
       setState((prev) => ({
         ...prev,
         status: 'done',
         progress: 100,
         progressText: '',
-        recipes: result.recipes,
-        matchedTotal: result.matchedTotal ?? result.recipes.length,
+        recipes,
+        matchedTotal: payload.meta?.total ?? recipes.length,
         refreshKey: refresh ? prev.refreshKey + 1 : 0,
-        generatedAt: result.generatedAt,
+        generatedAt: payload.meta?.generatedAt ?? new Date().toISOString(),
       }))
       return true
     } catch (error) {
