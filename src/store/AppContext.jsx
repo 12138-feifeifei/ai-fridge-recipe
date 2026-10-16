@@ -4,7 +4,7 @@ import {
   generateRecipes as requestRecipes,
   recognizeIngredients as requestRecognizeIngredients,
 } from '../services/api.js'
-import { toIngredientModelList, toRecipeModelList } from '../services/adapters.js'
+import { refreshRecipeMatches, toIngredientModelList, toRecipeModelList } from '../services/adapters.js'
 import { guessCategory, guessEmoji } from '../data/ingredients.js'
 import { SAMPLE_PHOTO_DATA_URL } from '../data/samplePhoto.js'
 import { dataUrlToFile, prepareImage } from '../utils/image.js'
@@ -42,9 +42,12 @@ function loadPersistedState() {
     const raw = window.sessionStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw)
+    const ingredients = Array.isArray(parsed.ingredients) ? parsed.ingredients : []
+    const selectedNames = ingredients.filter((item) => item?.selected !== false).map((item) => item?.name)
     return {
-      ingredients: Array.isArray(parsed.ingredients) ? parsed.ingredients : [],
-      recipes: Array.isArray(parsed.recipes) ? parsed.recipes : [],
+      ingredients,
+      // 旧会话里存的食谱可能带着旧算法算出的 0%，按当前勾选食材重算一遍
+      recipes: refreshRecipeMatches(parsed.recipes, selectedNames),
       matchedTotal: Number.isInteger(parsed.matchedTotal) ? parsed.matchedTotal : 0,
       refreshKey: Number.isInteger(parsed.refreshKey) ? parsed.refreshKey : 0,
       recognizedAt: parsed.recognizedAt ?? null,
@@ -278,7 +281,10 @@ export function AppProvider({ children }) {
       })
       if (taskRef.current !== taskId) return { ok: false, error: null, reason: 'STALE' }
 
-      const recipes = toRecipeModelList(payload.data)
+      // 把「用户勾选的食材」传下去：后端没返回 matchRate / matched 时由适配层现场算
+      const recipes = toRecipeModelList(payload.data, {
+        selectedNames: selected.map((item) => item.name),
+      })
       setState((prev) => ({
         ...prev,
         status: 'done',

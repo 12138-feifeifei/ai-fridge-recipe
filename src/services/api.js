@@ -80,9 +80,13 @@
  *                         也可以是 { "text": "热锅倒油", "minutes": 2 }
  *    - emoji / cover / difficulty / servings / intro / tip  string  可选，缺省时前端兜底
  *    - ingredients  string[]  可选，这道菜用到的食材
- *    - matched      string[]  可选，其中命中了用户勾选的食材
- *    - pantry       string[]  可选，需要用户自备的调料
- *    - matchRate    number    可选，匹配度 0~100，缺省时前端按 matched/ingredients 计算
+ *    - matched      string[]  可选，其中命中了用户勾选的食材（缺省时前端用
+ *                            「ingredients ∩ 用户勾选食材」补算）
+ *    - pantry       string[]  可选，需要用户自备的调料（后端只给 seasonings 时，
+ *                            前端自动减去用户已勾选的部分）
+ *    - matchRate    number    可选，匹配度 0~100（也接受 0~1 的小数）；
+ *                            缺省或为 0 时前端按 matched/ingredients 现场算，
+ *                            算不出就不显示匹配度标签（不会展示 0%）
  *    - minutes      number    可选，用时的数字版本（前端优先用它排序/展示）
  *
  *  meta.total 可选：本次命中的食谱总数（用于「匹配到 N 道，先看这 M 道」）。
