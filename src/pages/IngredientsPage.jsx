@@ -221,7 +221,7 @@ export default function IngredientsPage() {
                 下一步会用这些食材做什么？
               </p>
               <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
-                点击底部「生成食谱」，会把已勾选的 {selectedCount} 种食材发送给认谱服务（当前为 Mock），
+                点击底部「生成食谱」，会把已勾选的 {selectedCount} 种食材发送给 AI 服务，
                 返回带热量、时长和分步骤做法的推荐菜谱。
               </p>
             </Card>

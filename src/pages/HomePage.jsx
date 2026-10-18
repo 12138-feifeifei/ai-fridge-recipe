@@ -83,14 +83,14 @@ export default function HomePage() {
             {previewUrl ? '开始识别' : '先选择一张照片'}
           </Button>
           <p className="mt-2 text-center text-[11px] text-slate-400">
-            照片仅用于识别食材，当前为 Mock 数据，不会真实上传
+            照片仅用于识别食材与生成食谱
           </p>
         </StickyFooter>
       }
     >
       <PageHeader
         brand
-        title="冰箱小厨师"
+        title="冰箱食光"
         subtitle="拍一张冰箱照片，帮你决定今晚吃什么"
       />
 
