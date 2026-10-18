@@ -1,7 +1,7 @@
 # 冰箱食光 · 食材识别与食谱生成
 
 移动端优先的 Web App：上传冰箱照片 → 识别食材 → 勾选/增删改 → 生成食谱。
-当前后端 API 尚未就绪，**全流程使用 Mock 数据 + 模拟延迟**，交互与页面结构已经完整可用。
+默认走**真实后端接口**（`DATA_SOURCE = 'http'`）；没连后端时把数据源切回 Mock 也能跑通全流程。
 
 ## 技术栈
 
@@ -81,31 +81,45 @@ const res2 = await generateRecipes([{ id: '1', name: '番茄' }], { refreshKey: 
 // res2.data → [{ id: 'r1', title: '番茄炒蛋', calories: 300, time: '15分钟', steps: ['步骤1', ...] }]
 ```
 
-响应统一使用 `{ success, data, meta?, message? }` 信封；失败时抛出 `ApiError`（含 `status` / `code`）。
+后端返回 `{ code, data, meta?, message? }`，前端会归一化成统一的 `{ success, data, meta, message }` 信封
+（`{ success: true, data }` 这种老写法同样兼容）；失败时抛出 `ApiError`（含 `status` / `code` / 友好 `message`）。
 完整字段说明写在 `api.js` 顶部的 JSDoc 里，可以直接发给后端同学对照实现。
 
 | 接口 | 方法 | 请求 | 成功响应 |
 | --- | --- | --- | --- |
-| `/api/ingredients/recognize` | POST | `FormData: image` | `{ success: true, data: Ingredient[], meta: { count } }` |
-| `/api/recipes/generate` | POST | `{ ingredients: string[], refreshKey: number }` | `{ success: true, data: Recipe[], meta: { total, refreshKey } }` |
+| `/api/ingredients/recognize` | POST | `FormData`，字段 `image` | `{ code: 200, data: Ingredient[], meta?: { count } }` |
+| `/api/recipes/generate` | POST | `{ ingredients: string[], refreshKey: number }` | `{ code: 200, data: Recipe[], meta?: { total, refreshKey } }` |
 
-失败响应：`{ success: false, message: '识别失败，请重新上传', code: 'RECOGNIZE_FAILED' }`
+失败响应：`{ code: 500, message: '识别失败，请重新上传' }`（HTTP 非 2xx、`success: false`、或 `code` 不为 200 都会抛 `ApiError`）
 
 `Ingredient`（data 元素）：`{ id, name, confidence, emoji?, quantity?, category?, selected? }`
 
 `Recipe`（data 元素）：`{ id, title, calories, time, steps, emoji?, cover?, difficulty?, servings?, intro?, tip?, ingredients?, matched?, pantry?, matchRate?, minutes? }`
 ——其中 `steps` 支持 `['步骤1', '步骤2']` 或 `[{ text, minutes }]` 两种写法。
 
-请求基址与 Mock 开关都用环境变量控制（复制 `.env.example` 为 `.env.local`）：
+请求基址与数据源都用环境变量控制（复制 `.env.example` 为 `.env.local`）：
 
 ```bash
-VITE_API_BASE_URL=https://fridge-chef.pages.dev   # 同源部署可留空或写 /api
-VITE_USE_MOCK_API=false                            # 关掉 Mock，改走真实接口
+VITE_API_BASE_URL=https://你的后端域名.com   # 前后端同域部署可留空，走相对路径 /api/xxx
+VITE_DATA_SOURCE=http                         # http = 真实接口（默认）；mock = 内置假数据，方便离线调试
+VITE_DEV_PROXY_TARGET=http://localhost:8000   # 可选：本地开发时把 /api 代理到后端，绕开跨域
 ```
 
-请求层已内置统一能力：超时中断（`AbortController`）、HTTP/业务错误归一化成 `ApiError`、
-全局加载状态（`beginLoading` / `subscribeApiLoading` / `useApiLoading`）。
+切换方式：把 `VITE_DATA_SOURCE` 改成 `mock` 即可整体切回 Mock（代码里的 Mock 分支完整保留），
+改回 `http` 就走真实接口，业务代码一行都不用动。
+
+请求层已内置统一能力：
+
+- 超时中断（`AbortController`，默认 20s，可用 `request(path, { timeout })` 覆盖）；
+- 错误归一化：401（登录失效）/ 403 / 404 / 413 / 5xx / 超时 / 断网，都会变成带**友好中文文案**的 `ApiError`，
+  页面里直接 `showToast(error.message)` 即可；
+- 全局加载状态（`beginLoading` / `subscribeApiLoading` / `useApiLoading`）；
+- 真实请求期间用「乐观进度」驱动全屏动画（fetch 拿不到服务端处理进度）。
+
 后端字段和页面字段不一致时，只改 [src/services/adapters.js](src/services/adapters.js) 即可。
+
+> 安全：前端代码与 `.env` 里都**不含任何 API Key / Token**，Vite 的 `VITE_*` 变量会被打进产物等于公开。
+> 大模型、云存储等第三方密钥一律放在后端，前端只请求我们自己的业务接口。
 
 ## 设计说明
 
@@ -116,7 +130,7 @@ VITE_USE_MOCK_API=false                            # 关掉 Mock，改走真实�
 
 ## 后续可做
 
-- 接入真实识别/生成接口，替换 mock 延迟
+- 为真实接口补上请求重试与断点续传（大图上传）
 - 食材清单支持左滑删除、拖拽排序
 - 食谱详情页（独立路由）与收藏、购物清单
 - 用 Zustand / TanStack Query 替换 AppContext + 手写缓存

@@ -27,6 +27,13 @@ export function RecipeCard({ recipe, index = 0 }) {
   const visibleSteps = expanded ? steps : steps.slice(0, VISIBLE_STEP_COUNT)
   const hasMore = steps.length > VISIBLE_STEP_COUNT
 
+  // 匹配度：只有真的算出「>0 的百分比」时才挂右上角标签，绝不出现「匹配 0%」
+  const matchRate = Number(recipe.matchRate)
+  const showMatchRate = Number.isFinite(matchRate) && matchRate > 0
+  const matchedCount = Number(recipe.matchedCount ?? recipe.matched?.length)
+  const totalUsed = Number(recipe.totalUsed ?? recipe.uses?.length)
+  const showIngredientMetric = Number.isFinite(matchedCount) && matchedCount > 0 && totalUsed > 0
+
   return (
     <article
       className="animate-rise overflow-hidden rounded-[28px] border border-slate-900/5 bg-white shadow-card"
@@ -37,9 +44,11 @@ export function RecipeCard({ recipe, index = 0 }) {
           <ClockIcon className="h-3.5 w-3.5" />
           {recipe.minutes} 分钟
         </span>
-        <span className="absolute right-3 top-3 rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-bold text-brand-700 backdrop-blur-sm">
-          匹配 {recipe.matchRate ?? 100}%
-        </span>
+        {showMatchRate ? (
+          <span className="absolute right-3 top-3 rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-bold text-brand-700 backdrop-blur-sm">
+            匹配 {Math.round(matchRate)}%
+          </span>
+        ) : null}
         <span
           className="absolute bottom-1 left-1/2 -translate-x-1/2 select-none text-6xl drop-shadow-[0_6px_12px_rgba(15,23,42,0.18)]"
           aria-hidden="true"
@@ -59,15 +68,22 @@ export function RecipeCard({ recipe, index = 0 }) {
           </span>
         </div>
 
-        <dl className="mt-3 grid grid-cols-3 gap-1 rounded-2xl bg-slate-50 px-2 py-2.5">
+        <dl
+          className={cx(
+            'mt-3 grid gap-1 rounded-2xl bg-slate-50 px-2 py-2.5',
+            showIngredientMetric ? 'grid-cols-3' : 'grid-cols-2',
+          )}
+        >
           <Metric icon={<FlameIcon className="h-3.5 w-3.5" />} label="热量" value={`${recipe.calories} kcal`} tone="amber" />
           <Metric icon={<ClockIcon className="h-3.5 w-3.5" />} label="用时" value={`${recipe.minutes} 分钟`} tone="sky" />
-          <Metric
-            icon={<SparkleIcon className="h-3.5 w-3.5" />}
-            label="食材"
-            value={`${recipe.matchedCount ?? recipe.matched?.length ?? 0}/${recipe.totalUsed ?? recipe.uses?.length ?? 0}`}
-            tone="brand"
-          />
+          {showIngredientMetric ? (
+            <Metric
+              icon={<SparkleIcon className="h-3.5 w-3.5" />}
+              label="食材"
+              value={`${matchedCount}/${totalUsed}`}
+              tone="brand"
+            />
+          ) : null}
         </dl>
 
         {recipe.matched?.length ? (

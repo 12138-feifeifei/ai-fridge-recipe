@@ -2,11 +2,8 @@ import { CheckIcon, EditIcon, TrashIcon } from './icons.jsx'
 import { cx, IconButton } from './ui.jsx'
 
 function ConfidenceBadge({ value }) {
-  if (typeof value !== 'number') {
-    return (
-      <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">手动添加</span>
-    )
-  }
+  // 手动添加的食材没有置信度：不渲染任何标签，与 AI 识别的食材保持一致的展示
+  if (typeof value !== 'number') return null
   const percent = Math.round(value * 100)
   const tone = percent >= 90 ? 'bg-brand-50 text-brand-600' : percent >= 80 ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'
   return <span className={cx('rounded-full px-1.5 py-0.5 text-[10px] font-medium', tone)}>置信度 {percent}%</span>

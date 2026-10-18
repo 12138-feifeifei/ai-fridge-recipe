@@ -35,6 +35,7 @@ export default function HomePage() {
     selectSampleImage,
     clearImage,
     startRecognition,
+    dataSource,
   } = useApp()
   const navigate = useNavigate()
   const showToast = useToast()
@@ -64,9 +65,14 @@ export default function HomePage() {
       showToast('请先拍照或从相册选择一张照片')
       return
     }
-    const ok = await startRecognition()
-    if (ok) navigate('/ingredients')
-    else showToast('识别失败，请重试')
+    const result = await startRecognition()
+    if (result.ok) {
+      navigate('/ingredients')
+      return
+    }
+    if (result.reason === 'STALE') return
+    // error.message 已经由请求层归一化成友好文案（401 / 500 / 超时 / 断网…）
+    showToast(result.error?.message || '识别失败，请重试', { duration: 3600 })
   }
 
   let dropzoneStateClass = 'border-slate-300/90 bg-white/60 hover:border-brand-400 hover:bg-brand-50/40'
@@ -83,7 +89,9 @@ export default function HomePage() {
             {previewUrl ? '开始识别' : '先选择一张照片'}
           </Button>
           <p className="mt-2 text-center text-[11px] text-slate-400">
-            照片仅用于识别食材与生成食谱
+            {dataSource === 'mock'
+              ? '照片仅用于识别食材，当前为 Mock 数据，不会真实上传'
+              : '照片仅用于识别食材与生成食谱，仅发送给我们自己的识别服务'}
           </p>
         </StickyFooter>
       }
